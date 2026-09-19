@@ -13,8 +13,10 @@ import com.example.model.CaptureFormat
 import com.example.model.CaptureResolution
 import com.example.model.CapturedMediaInfo
 import com.example.model.ColorProfile
+import com.example.model.DenoiseMode
 import com.example.model.DeviceDetectionInfo
 import com.example.model.HistogramData
+import com.example.model.Manual2Adjustments
 import com.example.model.ShootingMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -102,6 +104,9 @@ class ProCameraViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _showPreviewDialog = MutableStateFlow(false)
     val showPreviewDialog = _showPreviewDialog.asStateFlow()
+
+    val manual2Adjustments = cameraController.manual2AdjustmentsFlow
+    val denoiseMode = cameraController.denoiseModeFlow
 
     // Pass-through flows from controller
     val histogramFlow = cameraController.histogramFlow
@@ -289,6 +294,18 @@ class ProCameraViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setNightDuration(seconds: Int) {
         _nightDurationSeconds.value = seconds
+    }
+
+    fun setManual2Adjustments(adjustments: Manual2Adjustments) {
+        cameraController.setManual2Adjustments(adjustments)
+    }
+
+    fun setDenoiseMode(mode: DenoiseMode) {
+        cameraController.setDenoiseMode(mode)
+    }
+
+    fun resumeCamera() {
+        cameraController.resumeCamera()
     }
 
     fun setShowDeviceInfoDialog(show: Boolean) {

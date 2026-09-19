@@ -69,7 +69,21 @@ enum class AwbPreset(val label: String, val kelvin: Int, val description: String
     SHADE("Sombra", 7500, "7500K - Sombra aberta sob céu azul"),
     INCANDESCENT("Tungstênio", 3200, "3200K - Lâmpadas incandescentes"),
     FLUORESCENT("Fluorescente", 4000, "4000K - Lâmpadas de escritório"),
-    CUSTOM_KELVIN("Manual", 0, "Ajuste manual preciso em graus Kelvin")
+    CUSTOM_KELVIN("Manual", 0, "Ajuste manual preciso em graus Kelvin"),
+    MANUAL_2("Manual 2", 0, "Ajuste fino de Brilho, Contraste, Sombras e Exposição")
+}
+
+data class Manual2Adjustments(
+    val brightness: Float = 0f,    // -100f to +100f
+    val contrast: Float = 0f,      // -100f to +100f
+    val shadows: Float = 0f,       // -100f to +100f
+    val highlights: Float = 0f     // -100f to +100f
+)
+
+enum class DenoiseMode(val label: String, val shortLabel: String, val description: String) {
+    OFF("Desativado", "OFF", "Sem redução de ruído (textura pura do sensor)"),
+    STANDARD("Padrão", "STD", "Redução de ruído padrão de hardware"),
+    AI_NEURAL("AI Neural (Gemini)", "AI", "Remoção avançada de ruído neural preservando nitidez de bordas")
 }
 
 enum class ActiveDial {
@@ -124,5 +138,7 @@ data class CapturedMediaInfo(
     val focalLength: String,
     val colorProfile: String,
     val isDng: Boolean,
-    val timestamp: Long
+    val timestamp: Long,
+    val orientationDegrees: Int = 0,
+    val denoiseMode: String = "Padrão"
 )

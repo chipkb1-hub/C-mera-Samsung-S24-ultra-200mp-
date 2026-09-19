@@ -1,9 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/ic_pro_camera"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
 
+    <!-- Top viewfinder/shutter notch -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M37,36 C37,33.5 39,32 41.5,32 L47.5,32 C50,32 52,33.5 52,36 L52,37 L37,37 Z" />
+
+    <!-- Main Camera Body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,37 L72,37 C77.5,37 82,41.5 82,47 L82,65 C82,70.5 77.5,75 72,75 L36,75 C30.5,75 26,70.5 26,65 L26,47 C26,41.5 30.5,37 36,37 Z" />
+
+    <!-- Outer Lens Ring (Cutout on white body) -->
+    <path
+        android:fillColor="#B71C1C"
+        android:pathData="M54,42 C61.73,42 68,48.27 68,56 C68,63.73 61.73,70 54,70 C46.27,70 40,63.73 40,56 C40,48.27 46.27,42 54,42 Z" />
+
+    <!-- Lens Inner Aperture -->
+    <path
+        android:fillColor="#15171C"
+        android:pathData="M54,46 C59.52,46 64,50.48 64,56 C64,61.52 59.52,66 54,66 C48.48,66 44,61.52 44,56 C44,50.48 48.48,46 54,46 Z" />
+
+    <!-- Lens Optical Glass Reflection Arc -->
+    <path
+        android:fillColor="#66FFFFFF"
+        android:pathData="M51.5,49 C53.5,49 55,50.5 55,52.5 C55,53.5 54.2,54.5 53,54.5 C51.8,54.5 50.5,53.5 50.5,52 C50.5,50.3 51,49 51.5,49 Z" />
+
+    <!-- Camera Flash Dot -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M73,45 C74.38,45 75.5,46.12 75.5,47.5 C75.5,48.88 74.38,50 73,50 C71.62,50 70.5,48.88 70.5,47.5 C70.5,46.12 71.62,45 73,45 Z" />
+</vector>

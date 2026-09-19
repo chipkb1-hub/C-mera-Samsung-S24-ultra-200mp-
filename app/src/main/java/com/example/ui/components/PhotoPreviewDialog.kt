@@ -27,13 +27,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -41,14 +43,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.model.CapturedMediaInfo
 
 @Composable
 fun PhotoPreviewDialog(
     media: CapturedMediaInfo,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onResumeCamera: () -> Unit = {}
 ) {
     val context = LocalContext.current
+
+    DisposableEffect(Unit) {
+        onDispose {
+            onResumeCamera()
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -62,7 +72,7 @@ fun PhotoPreviewDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
+                    .padding(18.dp)
                     .verticalScroll(rememberScrollState())
             ) {
                 // Header
@@ -80,7 +90,7 @@ fun PhotoPreviewDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "METADADOS DE CAPTURA PRO",
+                            text = "VISUALIZAÇÃO & METADADOS",
                             color = Color.White,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
@@ -101,7 +111,30 @@ fun PhotoPreviewDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Real Image Preview with Orientation Corrected
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black)
+                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AsyncImage(
+                        model = media.uri,
+                        contentDescription = "Foto capturada",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                            .testTag("preview_async_image")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Highlight Badge: 200MP ISOCELL HP2
                 Box(
@@ -109,40 +142,42 @@ fun PhotoPreviewDialog(
                         .fillMaxWidth()
                         .background(Color(0x33FFB300), RoundedCornerShape(8.dp))
                         .border(1.dp, Color(0x66FFB300), RoundedCornerShape(8.dp))
-                        .padding(12.dp)
+                        .padding(10.dp)
                 ) {
                     Column {
                         Text(
                             text = "MODO: PRO 200 MP (ISOCELL HP2)",
                             color = Color(0xFFFFD700),
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.ExtraBold,
                             fontFamily = FontFamily.Monospace
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Resolução Efetiva: ${media.resolution} (${media.megapixels.toInt()} Megapixels)",
+                            text = "Resolução: ${media.resolution} (${media.megapixels.toInt()} MP)",
                             color = Color.White,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // EXIF Technical Grid
                 ExifDataRow("Arquivo", media.fileName)
                 ExifDataRow("Formato", "${media.format} ${if (media.isDng) "(RAW 16-bit DNG)" else "(8-bit sRGB)"}")
                 ExifDataRow("Tamanho do Arquivo", media.fileSizeFormatted)
+                ExifDataRow("Orientação", "${media.orientationDegrees}° (Alinhada)")
                 ExifDataRow("Perfil de Cor", media.colorProfile)
+                ExifDataRow("Redução de Ruído", media.denoiseMode)
                 ExifDataRow("Sensibilidade ISO", "ISO ${media.iso}")
                 ExifDataRow("Velocidade do Obturador", media.exposureTime)
                 ExifDataRow("Distância Focal / Abertura", "${media.focalLength} • ${media.fNumber}")
                 ExifDataRow("Câmera / Sensor", "Samsung SM-S928B • 1/1.3\" Tetra²pixel")
                 ExifDataRow("Local de Salvamento", media.filePath)
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Privacy & Offline Badge
                 Box(
@@ -150,26 +185,26 @@ fun PhotoPreviewDialog(
                         .fillMaxWidth()
                         .background(Color(0x2200E5FF), RoundedCornerShape(8.dp))
                         .border(1.dp, Color(0x4400E5FF), RoundedCornerShape(8.dp))
-                        .padding(10.dp)
+                        .padding(8.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = null,
                             tint = Color(0xFF00E5FF),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "100% Offline • Sem GPS • Arquivo Local Seguro",
                             color = Color(0xFF80D8FF),
-                            fontSize = 10.sp,
+                            fontSize = 9.sp,
                             fontFamily = FontFamily.Monospace
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Action Buttons
                 Row(
@@ -181,6 +216,7 @@ fun PhotoPreviewDialog(
                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                 setDataAndType(media.uri, "image/*")
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             try {
                                 context.startActivity(intent)

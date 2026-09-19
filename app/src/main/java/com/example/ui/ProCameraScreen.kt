@@ -32,11 +32,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.example.model.DenoiseMode
 import com.example.ui.components.DeviceInfoDialog
 import com.example.ui.components.HistogramView
 import com.example.ui.components.NightCaptureOverlay
@@ -78,6 +82,9 @@ fun ProCameraScreen(
     val isNightModeActive by viewModel.isNightModeActive.collectAsState()
     val nightDurationSeconds by viewModel.nightDurationSeconds.collectAsState()
 
+    val manual2Adjustments by viewModel.manual2Adjustments.collectAsState()
+    val denoiseMode by viewModel.denoiseMode.collectAsState()
+
     val showDeviceInfoDialog by viewModel.showDeviceInfoDialog.collectAsState()
     val showPreviewDialog by viewModel.showPreviewDialog.collectAsState()
 
@@ -88,6 +95,20 @@ fun ProCameraScreen(
     val lightAccumulationPercent by viewModel.lightAccumulationPercent.collectAsState()
     val histogramData by viewModel.histogramFlow.collectAsState()
     val zoomRatio by viewModel.zoomRatio.collectAsState()
+
+    // Automatic camera resume on app foreground / return from gallery
+    val lifecycleOwner = LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.resumeCamera()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     // Tactile shutter flash
     var isShutterFlashing by remember { mutableStateOf(false) }
@@ -164,6 +185,15 @@ fun ProCameraScreen(
                 onToggleGrid = { viewModel.toggleGrid() },
                 isAeAfLocked = isAeAfLocked,
                 onToggleAeAfLock = { viewModel.toggleAeAfLock() },
+                denoiseMode = denoiseMode,
+                onToggleDenoiseMode = {
+                    val nextMode = when (denoiseMode) {
+                        DenoiseMode.STANDARD -> DenoiseMode.AI_NEURAL
+                        DenoiseMode.AI_NEURAL -> DenoiseMode.OFF
+                        DenoiseMode.OFF -> DenoiseMode.STANDARD
+                    }
+                    viewModel.setDenoiseMode(nextMode)
+                },
                 onOpenDeviceInfo = { viewModel.setShowDeviceInfoDialog(true) }
             )
 
@@ -236,6 +266,8 @@ fun ProCameraScreen(
             manualKelvin = manualKelvin,
             onWbPresetChanged = { viewModel.setWbPreset(it) },
             onKelvinChanged = { viewModel.setKelvin(it) },
+            manual2Adjustments = manual2Adjustments,
+            onManual2AdjustmentsChanged = { viewModel.setManual2Adjustments(it) },
             isNightModeActive = isNightModeActive,
             nightDurationSeconds = nightDurationSeconds,
             onNightDurationChanged = { viewModel.setNightDuration(it) },
@@ -265,7 +297,8 @@ fun ProCameraScreen(
         if (showPreviewDialog && lastCapturedMedia != null) {
             PhotoPreviewDialog(
                 media = lastCapturedMedia!!,
-                onDismiss = { viewModel.setShowPreviewDialog(false) }
+                onDismiss = { viewModel.setShowPreviewDialog(false) },
+                onResumeCamera = { viewModel.resumeCamera() }
             )
         }
 

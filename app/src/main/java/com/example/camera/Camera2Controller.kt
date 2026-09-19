@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Rect
 import android.graphics.SurfaceTexture
+import android.hardware.SensorManager
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
@@ -19,6 +20,7 @@ import android.hardware.camera2.DngCreator
 import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
+import android.media.ExifInterface
 import android.media.Image
 import android.media.ImageReader
 import android.net.Uri
@@ -29,6 +31,7 @@ import android.provider.MediaStore
 import android.util.Log
 import android.util.Range
 import android.util.Size
+import android.view.OrientationEventListener
 import android.view.Surface
 import com.example.model.AwbPreset
 import com.example.model.CameraLens
@@ -36,7 +39,9 @@ import com.example.model.CaptureFormat
 import com.example.model.CaptureResolution
 import com.example.model.CapturedMediaInfo
 import com.example.model.ColorProfile
+import com.example.model.DenoiseMode
 import com.example.model.HistogramData
+import com.example.model.Manual2Adjustments
 import com.example.model.ShootingMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -112,8 +117,48 @@ class Camera2Controller(private val context: Context) {
     var isPhotoLogEnabled: Boolean = false
     var currentZoom: Float = 1.0f
 
+    // Manual 2 adjustments (Brightness, Contrast, Shadows, Highlights)
+    var currentManual2Adjustments = Manual2Adjustments()
+    val manual2AdjustmentsFlow = MutableStateFlow(Manual2Adjustments())
+
+    // AI Neural Denoise Mode
+    var currentDenoiseMode: DenoiseMode = DenoiseMode.STANDARD
+    val denoiseModeFlow = MutableStateFlow(DenoiseMode.STANDARD)
+
+    // Device orientation detection for upright photos
+    private var orientationEventListener: OrientationEventListener? = null
+    private var deviceOrientationDegrees: Int = 0
+
     init {
         startBackgroundThread()
+        initOrientationListener()
+    }
+
+    private fun initOrientationListener() {
+        orientationEventListener = object : OrientationEventListener(context, SensorManager.SENSOR_DELAY_NORMAL) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                deviceOrientationDegrees = when (orientation) {
+                    in 45..134 -> 90
+                    in 135..224 -> 180
+                    in 225..314 -> 270
+                    else -> 0
+                }
+            }
+        }
+        if (orientationEventListener?.canDetectOrientation() == true) {
+            orientationEventListener?.enable()
+        }
+    }
+
+    fun computeJpegOrientation(): Int {
+        val sensorOrientation = cameraCharacteristics?.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
+        val facing = cameraCharacteristics?.get(CameraCharacteristics.LENS_FACING) ?: CameraCharacteristics.LENS_FACING_BACK
+        return if (facing == CameraCharacteristics.LENS_FACING_FRONT) {
+            (sensorOrientation + deviceOrientationDegrees) % 360
+        } else {
+            (sensorOrientation - deviceOrientationDegrees + 360) % 360
+        }
     }
 
     private fun startBackgroundThread() {
@@ -124,6 +169,7 @@ class Camera2Controller(private val context: Context) {
     }
 
     fun stopBackgroundThread() {
+        orientationEventListener?.disable()
         backgroundThread?.quitSafely()
         try {
             backgroundThread?.join()
@@ -132,6 +178,27 @@ class Camera2Controller(private val context: Context) {
         } catch (e: InterruptedException) {
             Log.e(tag, "Error stopping background thread", e)
         }
+    }
+
+    fun resumeCamera() {
+        val surface = cachedSurfaceTexture ?: return
+        if (cameraDevice == null || captureSession == null) {
+            openCamera(surface, cachedWidth, cachedHeight)
+        } else {
+            updatePreview()
+        }
+    }
+
+    fun setManual2Adjustments(adjustments: Manual2Adjustments) {
+        currentManual2Adjustments = adjustments
+        manual2AdjustmentsFlow.value = adjustments
+        updatePreview()
+    }
+
+    fun setDenoiseMode(mode: DenoiseMode) {
+        currentDenoiseMode = mode
+        denoiseModeFlow.value = mode
+        updatePreview()
     }
 
     fun openCamera(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
@@ -446,6 +513,35 @@ class Camera2Controller(private val context: Context) {
                 builder.set(CaptureRequest.COLOR_CORRECTION_MODE, CaptureRequest.COLOR_CORRECTION_MODE_TRANSFORM_MATRIX)
                 builder.set(CaptureRequest.COLOR_CORRECTION_GAINS, gains)
             }
+            AwbPreset.MANUAL_2 -> {
+                builder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO)
+                try {
+                    val compRange = cameraCharacteristics?.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+                    if (compRange != null) {
+                        val extraBias = ((currentManual2Adjustments.brightness + currentManual2Adjustments.highlights) / 50f).toInt()
+                        val step = cameraCharacteristics?.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)
+                        val stepVal = step?.let { it.numerator.toFloat() / it.denominator.toFloat() } ?: 0.333f
+                        val baseIndex = (exposureCompensationEv / stepVal).toInt()
+                        builder.set(
+                            CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION,
+                            (baseIndex + extraBias).coerceIn(compRange.lower, compRange.upper)
+                        )
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        // Noise Reduction Mode (Off, Standard Hardware, AI Neural)
+        when (currentDenoiseMode) {
+            DenoiseMode.OFF -> {
+                builder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_OFF)
+            }
+            DenoiseMode.STANDARD -> {
+                builder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_FAST)
+            }
+            DenoiseMode.AI_NEURAL -> {
+                builder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY)
+            }
         }
 
         // AE/AF Lock
@@ -590,21 +686,28 @@ class Camera2Controller(private val context: Context) {
 
                     // Night mode long exposure on sensor
                     if (nightExposureDurationSeconds > 0) {
-                        val durationNs = (nightExposureDurationSeconds.toLong() * 1_000_000_000L)
-                            .coerceIn(exposureTimeRange.value)
-                        set(CaptureRequest.SENSOR_EXPOSURE_TIME, durationNs)
-                        set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+                        set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                        try {
+                            val compRange = cameraCharacteristics?.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+                            if (compRange != null) {
+                                set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, compRange.upper)
+                            }
+                        } catch (_: Exception) {}
+                        val maxIso = sensorIsoRange.value.endInclusive
+                        set(CaptureRequest.SENSOR_SENSITIVITY, maxIso.coerceAtLeast(1600))
                     }
 
+                    val jpegOrientation = computeJpegOrientation()
                     set(CaptureRequest.JPEG_QUALITY, 100.toByte())
-                    set(CaptureRequest.JPEG_ORIENTATION, 0)
+                    set(CaptureRequest.JPEG_ORIENTATION, jpegOrientation)
                 }
 
+                val targetOrientation = computeJpegOrientation()
                 var capturedResult: TotalCaptureResult? = null
 
                 jpegReader.setOnImageAvailableListener({ reader ->
                     val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
-                    saveCapturedImage(image, capturedResult, nightExposureDurationSeconds)
+                    saveCapturedImage(image, capturedResult, nightExposureDurationSeconds, targetOrientation)
                     image.close()
                 }, backgroundHandler)
 
@@ -663,17 +766,26 @@ class Camera2Controller(private val context: Context) {
     private fun saveCapturedImage(
         image: Image,
         captureResult: TotalCaptureResult?,
-        nightExposureDurationSeconds: Int = 0
+        nightExposureDurationSeconds: Int = 0,
+        orientationDegrees: Int = 0
     ) {
         try {
             val buffer = image.planes[0].buffer
-            var bytes = ByteArray(buffer.remaining())
-            buffer.get(bytes)
+            val rawBytes = ByteArray(buffer.remaining())
+            buffer.get(rawBytes)
 
-            // If Night Mode was active, enhance brightness and photon accumulation
-            if (nightExposureDurationSeconds > 0) {
-                bytes = ToneCurveHelper.processNightExposure(bytes, nightExposureDurationSeconds)
-            }
+            // Master Image Pipeline:
+            // 1. Physically rotates bitmap so vertical photos are always vertical and horizontal are horizontal
+            // 2. Applies Night Mode photon accumulation and shadow lifting
+            // 3. Applies Manual 2 adjustments (Brightness, Contrast, Shadows, Highlights)
+            // 4. Applies AI Neural Denoise (Gemini/ChatGPT remastering)
+            val bytes = ToneCurveHelper.processMasterPipeline(
+                rawBytes = rawBytes,
+                orientationDegrees = orientationDegrees,
+                nightExposureSeconds = nightExposureDurationSeconds,
+                manual2Adjustments = if (currentAwbPreset == AwbPreset.MANUAL_2) currentManual2Adjustments else null,
+                denoiseMode = currentDenoiseMode
+            )
 
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
             val fileName = "PRO_200MP_${currentResolution.label.replace(" ", "")}_$timeStamp.jpg"
@@ -734,7 +846,9 @@ class Camera2Controller(private val context: Context) {
                     focalLength = currentLens.focalLength,
                     colorProfile = if (isPhotoLogEnabled) "Foto LOG" else currentColorProfile.label,
                     isDng = false,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    orientationDegrees = orientationDegrees,
+                    denoiseMode = currentDenoiseMode.label
                 )
 
                 scope.launch {

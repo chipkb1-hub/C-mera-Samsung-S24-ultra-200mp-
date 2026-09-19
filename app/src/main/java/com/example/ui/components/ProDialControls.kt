@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,6 +41,7 @@ import com.example.model.ActiveDial
 import com.example.model.AwbPreset
 import com.example.model.CameraLens
 import com.example.model.CapturedMediaInfo
+import com.example.model.Manual2Adjustments
 import java.util.Locale
 
 @Composable
@@ -65,6 +67,8 @@ fun ProDialControls(
     manualKelvin: Int,
     onWbPresetChanged: (AwbPreset) -> Unit,
     onKelvinChanged: (Int) -> Unit,
+    manual2Adjustments: Manual2Adjustments = Manual2Adjustments(),
+    onManual2AdjustmentsChanged: (Manual2Adjustments) -> Unit = {},
     isNightModeActive: Boolean,
     nightDurationSeconds: Int,
     onNightDurationChanged: (Int) -> Unit,
@@ -144,7 +148,7 @@ fun ProDialControls(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp)
+                .heightIn(min = 68.dp)
                 .padding(horizontal = 16.dp)
         ) {
             when (activeDial) {
@@ -180,7 +184,9 @@ fun ProDialControls(
                         preset = awbPreset,
                         kelvin = manualKelvin,
                         onPresetChanged = onWbPresetChanged,
-                        onKelvinChanged = onKelvinChanged
+                        onKelvinChanged = onKelvinChanged,
+                        manual2Adjustments = manual2Adjustments,
+                        onManual2AdjustmentsChanged = onManual2AdjustmentsChanged
                     )
                 }
                 ActiveDial.NONE -> {
@@ -679,7 +685,9 @@ private fun WbKelvinControl(
     preset: AwbPreset,
     kelvin: Int,
     onPresetChanged: (AwbPreset) -> Unit,
-    onKelvinChanged: (Int) -> Unit
+    onKelvinChanged: (Int) -> Unit,
+    manual2Adjustments: Manual2Adjustments,
+    onManual2AdjustmentsChanged: (Manual2Adjustments) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -694,7 +702,11 @@ private fun WbKelvinControl(
                     modifier = Modifier
                         .testTag("wb_preset_${p.name}")
                         .clip(RoundedCornerShape(6.dp))
-                        .background(if (isSelected) Color(0xFFFFB300) else Color(0x22FFFFFF))
+                        .background(
+                            if (isSelected) {
+                                if (p == AwbPreset.MANUAL_2) Color(0xFFFFD700) else Color(0xFFFFB300)
+                            } else Color(0x22FFFFFF)
+                        )
                         .clickable { onPresetChanged(p) }
                         .padding(horizontal = 7.dp, vertical = 4.dp)
                 ) {
@@ -709,6 +721,7 @@ private fun WbKelvinControl(
         }
 
         if (preset == AwbPreset.CUSTOM_KELVIN) {
+            Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -730,7 +743,124 @@ private fun WbKelvinControl(
                 )
                 Text(text = "10000K", color = Color(0xFF80D8FF), fontSize = 9.sp)
             }
+        } else if (preset == AwbPreset.MANUAL_2) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Manual2ExposureBars(
+                adjustments = manual2Adjustments,
+                onAdjustmentsChanged = onManual2AdjustmentsChanged
+            )
         }
+    }
+}
+
+@Composable
+private fun Manual2ExposureBars(
+    adjustments: Manual2Adjustments,
+    onAdjustmentsChanged: (Manual2Adjustments) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0x33000000))
+            .border(1.dp, Color(0x33FFD700), RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .testTag("manual2_exposure_bars")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "BARRA MANUAL 2 • BRILHO / CONTRASTE / SOMBRAS",
+                color = Color(0xFFFFD700),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0x33FFFFFF))
+                    .clickable { onAdjustmentsChanged(Manual2Adjustments()) }
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "REDEFINIR",
+                    color = Color.White,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        FineAdjustmentBar(
+            label = "BRILHO",
+            value = adjustments.brightness,
+            onValueChange = { onAdjustmentsChanged(adjustments.copy(brightness = it)) }
+        )
+
+        FineAdjustmentBar(
+            label = "CONTRASTE",
+            value = adjustments.contrast,
+            onValueChange = { onAdjustmentsChanged(adjustments.copy(contrast = it)) }
+        )
+
+        FineAdjustmentBar(
+            label = "SOMBRAS",
+            value = adjustments.shadows,
+            onValueChange = { onAdjustmentsChanged(adjustments.copy(shadows = it)) }
+        )
+
+        FineAdjustmentBar(
+            label = "EXPOSIÇÃO",
+            value = adjustments.highlights,
+            onValueChange = { onAdjustmentsChanged(adjustments.copy(highlights = it)) }
+        )
+    }
+}
+
+@Composable
+private fun FineAdjustmentBar(
+    label: String,
+    value: Float,
+    onValueChange: (Float) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(26.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = Color(0xCCFFFFFF),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.width(68.dp)
+        )
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = -100f..100f,
+            colors = SliderDefaults.colors(
+                thumbColor = Color(0xFFFFD700),
+                activeTrackColor = Color(0xFFFFD700),
+                inactiveTrackColor = Color(0x33FFFFFF)
+            ),
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = String.format(Locale.US, "%+d%%", value.toInt()),
+            color = if (value != 0f) Color(0xFFFFD700) else Color(0x88FFFFFF),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.width(42.dp)
+        )
     }
 }
 

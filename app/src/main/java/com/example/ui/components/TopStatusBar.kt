@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.CaptureFormat
 import com.example.model.CaptureResolution
+import com.example.model.DenoiseMode
 import com.example.model.DeviceDetectionInfo
 import com.example.model.ShootingMode
 
@@ -62,6 +63,8 @@ fun TopStatusBar(
     onToggleGrid: () -> Unit,
     isAeAfLocked: Boolean,
     onToggleAeAfLock: () -> Unit,
+    denoiseMode: DenoiseMode = DenoiseMode.STANDARD,
+    onToggleDenoiseMode: () -> Unit = {},
     onOpenDeviceInfo: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -274,6 +277,25 @@ fun TopStatusBar(
                 activeColor = Color.White,
                 onClick = onToggleGrid,
                 testTag = "toggle_grid"
+            )
+
+            // Toggle Button: AI NOISE REDUCTION
+            val nrColor = when (denoiseMode) {
+                DenoiseMode.AI_NEURAL -> Color(0xFFE040FB)
+                DenoiseMode.STANDARD -> Color(0xFF00E676)
+                DenoiseMode.OFF -> Color(0x88FFFFFF)
+            }
+            val nrLabel = when (denoiseMode) {
+                DenoiseMode.AI_NEURAL -> "✨ AI RUÍDO"
+                DenoiseMode.STANDARD -> "NR PADRÃO"
+                DenoiseMode.OFF -> "NR DESL."
+            }
+            PillToggleButton(
+                label = nrLabel,
+                isActive = denoiseMode != DenoiseMode.OFF,
+                activeColor = nrColor,
+                onClick = onToggleDenoiseMode,
+                testTag = "toggle_denoise_mode"
             )
         }
     }

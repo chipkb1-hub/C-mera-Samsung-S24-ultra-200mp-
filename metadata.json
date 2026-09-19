@@ -1,0 +1,6 @@
+{
+  "name": "Pro Camera 200MP",
+  "description": "Aplicativo de câmera profissional para Galaxy S24 Ultra (SM-S928B) com sensor ISOCELL HP2 200MP, controles manuais de ISO, obturador, foco, EV, WB/Kelvin, RAW/DNG, histograma, zebra, focus peaking e longa exposição.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
